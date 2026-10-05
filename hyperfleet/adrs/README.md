@@ -103,3 +103,4 @@ What did we decide? State it plainly.
 | [0025](0025-oci-operand-image-delivery.md) | Image Sourcing and Supply Chain for the OCI Operands | Active | 2026-09-18 |
 | [0026](0026-co-located-service-databases-shared-postgres-isolation.md) | Co-Located Service Databases on Shared Postgres: Isolation Model | Active | 2026-10-01 |
 | [0027](0027-tenant-dimension-cardinality.md) | Mixed Tenant Dimension Cardinality: Owner-Inherited Child Tenancy and an Unscoped Referencer Check | Active | 2026-09-30 |
+| [0028](0028-apply-delete-ordering.md) | Serialize Apply Then Delete | Active | 2026-10-05 |
