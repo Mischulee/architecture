@@ -20,6 +20,8 @@ Run one loop per pass: finish every ApplyDesire, then run the DeleteDesires. The
 
 Each pass lists the store fresh before it starts. The ordering closes the race only because of that listing: creating a DeleteDesire removes the ApplyDesire for the same object from the store, so an apply that was removed during one pass is absent from the next listing and cannot run after the delete it conflicts with. A pass that reuses a listing from an earlier pass reopens the race with the ordering intact, so the fresh listing is part of this decision, not an implementation detail.
 
+The ordering holds only while one pass runs per management-cluster partition at a time. Passes inside one process do not overlap, because each pass starts only after the previous one returns. Two applier processes bound to the same partition would each run their own passes, and the apply phase of one can overlap the delete phase of the other, so the applier runs a single replica per partition. Running more than one replica needs leader election or partition ownership first, and that is outside this decision.
+
 Implementation is tracked in [HYPERFLEET-1741](https://redhat.atlassian.net/browse/HYPERFLEET-1741).
 
 ## Consequences
