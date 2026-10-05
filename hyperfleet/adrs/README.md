@@ -102,3 +102,4 @@ What did we decide? State it plainly.
 | [0024](0024-oke-load-balancer-security-nsg.md) | Dedicated Network Security Group for OKE Load Balancer Traffic | Active | 2026-09-15 |
 | [0025](0025-oci-operand-image-delivery.md) | Image Sourcing and Supply Chain for the OCI Operands | Active | 2026-09-18 |
 | [0027](0027-tenant-dimension-cardinality.md) | Mixed Tenant Dimension Cardinality: Owner-Inherited Child Tenancy and an Unscoped Referencer Check | Active | 2026-09-30 |
+| [0028](0028-cross-cluster-applier-identity-and-partition-binding.md) | Cross-Cluster Applier Identity and Partition Binding | Proposed | 2026-10-05 |
