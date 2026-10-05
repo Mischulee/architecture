@@ -4,7 +4,7 @@ Owner: HyperFleet Architecture Team
 Last Updated: 2026-10-05
 ---
 
-# 0028 - Cross-Cluster Applier Identity and Partition Binding
+# 0029 - Cross-Cluster Applier Identity and Partition Binding
 
 ## Context
 

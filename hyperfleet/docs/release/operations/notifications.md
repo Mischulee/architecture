@@ -1,14 +1,16 @@
 ---
 Status: Active
 Owner: HyperFleet Team
-Last Updated: 2026-06-22
+Last Updated: 2026-10-01
 ---
 
 # Notifications and Status Signals
 
-> **Audience:** HyperFleet engineers wiring or troubleshooting release notifications, or trying to find out where to watch a release land.
+> **Audience:** HyperFleet engineers wiring or troubleshooting build and release notifications, or trying to find out where to watch a release land.
 
-The HyperFleet release pipeline emits signals to five places. This page covers what they are, what posts there, and how to change or rotate each one.
+HyperFleet build and release pipelines emit status signals to several places.
+This page covers what they are, what posts there, and how to change or rotate
+each one.
 
 ---
 
@@ -17,6 +19,7 @@ The HyperFleet release pipeline emits signals to five places. This page covers w
 | Surface | What lands there | Driven by |
 |---------|-----------------|-----------|
 | **Slack `#hyperfleet-e2e-status`** | Per-component release success/failure messages from `rh-push-to-external-registry` | `data.slack` in the RPA |
+| **Slack build failure alerts** | Failed on-push, tag, and chart PipelineRuns | `slack-webhook-notification` final task in each component repository |
 | **Konflux UI** | Pipeline runs, Snapshots, Releases, EC verdicts, scan results | Konflux platform |
 | **Pyxis / Red Hat Container Catalog** | Image entry + metadata + CVE tracking | `create-pyxis-image` task in the release pipeline |
 | **GitHub commit status** | PaC reports build pass/fail back to the commit | PaC controller |
@@ -69,7 +72,8 @@ If you need different content per channel, that's a custom finally-task — out 
 
 1. Create a new incoming webhook in Slack for `#hyperfleet-e2e-status`.
 2. Open an MR or ticket with RelEng asking them to update the `webhook-url` key on `hyperfleet-slack-webhook-notification-secret` in `rhtap-releng-tenant` on `kflux-prd-rh02`.
-3. Revoke the old webhook in Slack.
+3. If the same webhook URL is also used for build alerts, coordinate the build-tenant Secret update and validate both consumers before revoking the old URL. See [Build failure alerts](#build-failure-alerts).
+4. Revoke the old webhook in Slack after validation.
 
 No `konflux-release-data` change is needed — the RPA references the secret by name, not the URL.
 
@@ -80,6 +84,58 @@ If `#hyperfleet-e2e-status` stops getting messages:
 1. Confirm a release actually fired: Konflux UI → Releases.
 2. Open the release's managed PipelineRun → look for the `slack-notification` task in the `finally` block.
 3. Common failures: secret rotated incorrectly, webhook URL revoked, Slack rate-limited. All show up in the task logs.
+
+---
+
+## Build failure alerts
+
+The API, Sentinel, Adapter, Operator, and Applier repositories each define four
+Konflux PipelineRuns with a `slack-webhook-notification` task in
+`spec.pipelineSpec.finally`. The task runs only when `$(tasks.status)` is
+`Failed`. Its message names the repository, pipeline, and commit, with a labeled
+link to the failed run. Successful runs skip the task. It cannot alert on a
+Pipelines as Code rejection or another failure that prevents a PipelineRun
+from starting.
+
+The message uses [Slack app link formatting](https://docs.slack.dev/messaging/formatting-message-text/)
+such as `<URL|Open in Konflux>`. Tekton resolves the `$(...)` values before the
+task posts the message. Pasting the YAML template into Slack's message editor
+does not test the webhook output: the URLs still contain Tekton variables, and
+the editor has [different link markup](https://slack.com/help/articles/360039953113-Format-your-messages-in-Slack-with-markup).
+
+The build task reads `hyperfleet-slack-webhook-url` from Secret
+`hyperfleet-slack-webhook-notification-secret` in the `hyperfleet-tenant`
+namespace on `kflux-prd-rh02`. HyperFleet manages this namespace and Secret.
+The release pipeline uses a separate Secret in `rhtap-releng-tenant`, managed
+by RelEng. The webhook URL may be shared; check before rotating either Secret.
+Do not put the URL in Git, a ticket, or task logs.
+
+Each repository documents its PipelineRuns and webhook rotation:
+
+- [API](https://github.com/openshift-hyperfleet/hyperfleet-api/blob/main/.tekton/README.md)
+- [Sentinel](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/.tekton/README.md)
+- [Adapter](https://github.com/openshift-hyperfleet/hyperfleet-adapter/blob/main/.tekton/README.md)
+- [Operator](https://github.com/openshift-hyperfleet/hyperfleet-operator/blob/main/.tekton/README.md)
+- [Applier](https://github.com/openshift-hyperfleet/hyperfleet-applier/blob/main/.tekton/README.md)
+
+### Missing build alert
+
+1. Open the failed build PipelineRun in the Konflux UI and inspect its
+   `slack-webhook-notification` final task and logs. A missing Secret or key,
+   task resolution failure, revoked URL, or Slack delivery error appears there.
+2. Confirm the task can mount the Secret in `hyperfleet-tenant`; the release
+   namespace Secret cannot be mounted across namespaces.
+3. If no PipelineRun exists, inspect the commit's Pipelines as Code check and
+   trigger rules. The `finally` task cannot cover a run that never started.
+
+To rotate the build webhook, obtain a replacement for the approved channel and
+update the build-tenant Secret through HyperFleet's Secret management process.
+Update its configuration source if one is used. If the URL is shared with
+releases, coordinate the release Secret update with RelEng. With authorization
+for a controlled run and Slack post, verify a failed build alert arrives within a few
+minutes with the correct fields and link, a successful build emits no failure
+alert, and a release notification still arrives when the URL is shared. Only
+then revoke the old webhook.
 
 ---
 

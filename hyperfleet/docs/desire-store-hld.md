@@ -27,7 +27,7 @@ Last Updated: 2026-10-05
 - [ADR-0022: API-Mediated Desire Store Access](../adrs/0022-api-mediated-desire-store-access.md)
 - [ADR-0020: Envoy and Authorino API Gateway](../adrs/0020-envoy-authorino-api-gateway.md)
 - [Remote Applier Connectivity and Partition-Scoped Access to Postgres](spike-remote-applier-postgres-access.md)
-- [ADR-0028: Cross-Cluster Applier Identity and Partition Binding](../adrs/0028-cross-cluster-applier-identity-and-partition-binding.md)
+- [ADR-0029: Cross-Cluster Applier Identity and Partition Binding](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md)
 
 ## Purpose and Scope
 
@@ -123,7 +123,7 @@ Remote Appliers use short-lived projected Kubernetes service-account JWTs issued
 
 ## Identity-to-Partition Binding
 
-The Hub maintains a registry that maps each remote Applier identity to exactly one management-cluster partition. Only a Hub-owned binding-management component can create, replace, or disable a binding. Authorino resolves the active binding and injects the partition scope; the API never derives scope from client parameters or untrusted claims. The alternatives and rationale are recorded in [ADR-0028](../adrs/0028-cross-cluster-applier-identity-and-partition-binding.md).
+The Hub maintains a registry that maps each remote Applier identity to exactly one management-cluster partition. Only a Hub-owned binding-management component can create, replace, or disable a binding. Authorino resolves the active binding and injects the partition scope; the API never derives scope from client parameters or untrusted claims. The alternatives and rationale are recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md).
 
 **Trade-off:** The registry adds a lookup and availability dependency, but provides explicit ownership and lifecycle control for onboarding, replacement, and revocation.
 
@@ -184,4 +184,4 @@ End-to-end transport and gateway capacity validation, including shared-Postgres 
 
 ## AuthConfig Impact
 
-ADR-0020 remains unchanged. The remote Applier is a distinct partition-scoped caller, as recorded in [ADR-0028](../adrs/0028-cross-cluster-applier-identity-and-partition-binding.md). The follow-up detailed design will define the concrete AuthConfig structure and authorization rules.
+ADR-0020 remains unchanged. The remote Applier is a distinct partition-scoped caller, as recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md). The follow-up detailed design will define the concrete AuthConfig structure and authorization rules.
