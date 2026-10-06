@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Architecture Team
-Last Updated: 2026-10-05
+Last Updated: 2026-10-06
 ---
 
 # Desire Store Architecture Overview
@@ -47,21 +47,21 @@ flowchart LR
         HISS["Hub Kubernetes service-account JWT issuer"]
         AD["Adapter"]
         GC["Centralized sweeper"]
-        REG["Hub binding-management component"]
+        OP["Hub HyperFleet operator"]
+        AC["Operator-managed AuthConfig"]
         GW["Private Envoy + Authorino gateway"]
-        BIND["Identity-to-partition registry"]
         DS["Desire Store API service"]
         PG[("Private Postgres")]
 
         HISS -.->|"projected token"| AD
         HISS -.->|"projected token"| GC
-        HISS -.->|"projected token"| REG
+        HISS -.->|"projected token"| OP
         AD -->|"API request"| GW
         GC -->|"partition-scoped cleanup"| GW
-        REG -->|"manage bindings"| BIND
+        OP -->|"reconcile caller and partition policy"| AC
         AP -->|"HTTPS; no DB credentials"| GW
         GW -->|"trusted identity and partition"| DS
-        GW -.->|"resolve binding"| BIND
+        GW -.->|"read AuthConfig policy"| AC
         DS -->|"service database role"| PG
     end
 ```
@@ -102,7 +102,7 @@ sequenceDiagram
 | Adapter | Hub | One partition authorized and injected by the gateway per request | Writes desired state and cleanup records. |
 | Remote Applier | Management cluster | Exactly one registered partition | Reads its partition and writes status. |
 | Centralized sweeper | Hub | One partition authorized and injected by the gateway per cleanup request | Finds and cleans up orphaned desires. |
-| Binding-management component | Hub | Binding registry | Creates, replaces, and disables identity-to-partition bindings. It is not a Desire Store data caller. |
+| HyperFleet operator | Hub | Proposed AuthConfig policy | Will reconcile remote caller identities and partition mappings. It is not a Desire Store data caller. |
 
 ## Trust Boundaries and Partition Isolation
 
@@ -123,15 +123,15 @@ Remote Appliers use short-lived projected Kubernetes service-account JWTs issued
 
 ## Identity-to-Partition Binding
 
-The Hub maintains a registry that maps each remote Applier identity to exactly one management-cluster partition. Only a Hub-owned binding-management component can create, replace, or disable a binding. Authorino resolves the active binding and injects the partition scope; the API never derives scope from client parameters or untrusted claims. The alternatives and rationale are recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md).
+The proposed model has the Hub operator manage AuthConfig entries that map each remote Applier identity to exactly one management-cluster partition. Authorino resolves the matching policy and injects the partition scope; the API never derives scope from client parameters or untrusted claims. This requires extending the current operator and gateway configuration to bind each remote Applier identity to a partition; existing issuer, audience, and JWKS settings do not define that binding. The alternatives and rationale are recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md).
 
-**Trade-off:** The registry adds a lookup and availability dependency, but provides explicit ownership and lifecycle control for onboarding, replacement, and revocation.
+**Trade-off:** Operator-managed AuthConfig avoids a runtime registry lookup, but requires new dynamic reconciliation and timely propagation of onboarding, replacement, and revocation changes.
 
-**Acceptable because:** Once the binding cache expires, revoked identities are denied. This provides stronger control than relying on client claims or identity-name conventions.
+**Acceptable because:** Authorino supports live AuthConfig reconciliation, so the operator can manage partition policy without adding a separate registry service once the required per-cluster support is implemented.
 
 ## Desire Store API Hosting
 
-The Desire Store API is a dedicated Hub service behind its own private Envoy and Authorino gateway. This separates Desire Store traffic, scaling, rollout, and service-level failure behavior from the general API. Sharing Postgres remains provisional: it depends on demonstrated dedup effectiveness and a production-sized benchmark running API and desire-store workloads concurrently. Use a separate backend if either gate fails.
+The Desire Store API is a dedicated Hub service behind its own private Envoy and Authorino gateway. This separates Desire Store traffic, scaling, rollout, and service-level failure behavior from the general API. It uses a dedicated `desire_store` database on the shared Postgres instance, as defined by [ADR-0026](../adrs/0026-co-located-service-databases-shared-postgres-isolation.md). A separate Postgres instance is a future option, not the default.
 
 **Alternative:** Host the endpoints in the existing API, but this would couple Desire Store traffic and failures to the general API's resources and releases.
 
@@ -156,7 +156,7 @@ The Desire Store API is a dedicated Hub service behind its own private Envoy and
 
 ## Database Protection and Partition Isolation
 
-The API service enforces a trusted, non-empty partition scope before data-layer access and uses a dedicated database role limited to the Desire Store schema. Direct database access from Appliers is not permitted.
+The API service enforces a trusted, non-empty partition scope before data-layer access and uses a dedicated database role restricted to the `desire_store` database. Direct database access from Appliers is not permitted.
 
 **Alternatives:**
 
@@ -165,7 +165,7 @@ The API service enforces a trusted, non-empty partition scope before data-layer 
 
 **Trade-off:** Service-layer enforcement is simpler to operate and test, but it relies on correct application predicates. RLS adds transaction and connection-pooling complexity, while per-partition sessions or credentials add onboarding, rotation, and revocation work for every management cluster.
 
-**Acceptable because:** Gateway authentication, network policy, trusted partition injection, and mandatory service-layer checks provide layered protection without the first-release complexity of RLS or per-partition database access. RLS can be added if security review, compliance, or implementation complexity requires an independent database control.
+**Acceptable because:** Gateway authentication and network policy restrict access to the API, while partition isolation depends on the mandatory service-layer checks. A defect in those checks could expose multiple partitions. RLS can be added if security review, compliance, or implementation complexity requires an independent database control.
 
 ## Capacity and Rate Limits
 
@@ -184,4 +184,4 @@ End-to-end transport and gateway capacity validation, including shared-Postgres 
 
 ## AuthConfig Impact
 
-ADR-0020 remains unchanged. The remote Applier is a distinct partition-scoped caller, as recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md). The follow-up detailed design will define the concrete AuthConfig structure and authorization rules.
+ADR-0020 remains unchanged. The remote Applier is a distinct partition-scoped caller, as recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md). The DD will define the AuthConfig structure and required operator/gateway changes.

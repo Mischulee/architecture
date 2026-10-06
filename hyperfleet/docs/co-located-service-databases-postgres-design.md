@@ -142,7 +142,7 @@ Before the first migration, the platform admin creates the canonical schema and 
 
 Only **actual PostgreSQL connection pools** are counted here. Broker connections to `event_store` apply only when the PostgreSQL backend for the Broker is selected; RabbitMQ and Pub/Sub do not create these pools. The two workloads are reached differently:
 
-- **Desire Store** is API-mediated ([ADR-0022](../adrs/0022-api-mediated-desire-store-access.md)): Adapters and Appliers never hold a database connection; the hub desire-store service does. The service itself (existing API or a dedicated hub service) is decided by [HYPERFLEET-1645](https://redhat.atlassian.net/browse/HYPERFLEET-1645).
+- **Desire Store** is API-mediated ([ADR-0022](../adrs/0022-api-mediated-desire-store-access.md)): Adapters and Appliers never hold a database connection; the dedicated Hub Desire Store service does, as selected by [HYPERFLEET-1737](https://redhat.atlassian.net/browse/HYPERFLEET-1737).
 - **PostgreSQL backend for the Broker** runs through the `hyperfleet-broker` **library** ([ADR-0002](../adrs/0002-pluggable-message-broker-library.md)) inside Sentinel and every Adapter. Each process using this backend opens its own pool to `event_store`; the library has no pods, replicas, or chart of its own. Backend implementation details belong to [HYPERFLEET-1656](https://redhat.atlassian.net/browse/HYPERFLEET-1656).
 
 API calls (HTTP) and Applier access are not database connections. Size each database for **peak**, including rollout and migration overlap:
@@ -165,7 +165,7 @@ The formulas assume a common pool size per workload; for differing Adapter pool 
 | Migrations for the PostgreSQL backend for the Broker | mig_broker | `event_store` |
 | Appliers (API-mediated, ADR-0022) | 0 | — |
 
-Exactly one of the two Desire Store rows applies; the API-pod variant still has a separate pool to `desire_store`, not part of the `hyperfleet` pool. Hosting is decided by [HYPERFLEET-1645](https://redhat.atlassian.net/browse/HYPERFLEET-1645). The API chart defaults to `pool.max_connections: 50`, with HPA disabled and `maxSurge: 1`. If HPA is enabled with its configured default ceiling of 10 replicas, the runtime upper bound is `(10 + 1) × 50 = 550`, before adding migration connections — already above the 450 allocatable on an illustrative 500-connection instance with 10% reserved. The actual maximum replicas and pool sizes must fit the provisioned capacity. The Desire Store and PostgreSQL backend designs supply their own pool, surge, and migration budgets; these are not additional defaults imposed here.
+The dedicated-service Desire Store row applies; its pool is charged to `desire_store`, not the `hyperfleet` pool. The API chart defaults to `pool.max_connections: 50`, with HPA disabled and `maxSurge: 1`. If HPA is enabled with its configured default ceiling of 10 replicas, the runtime upper bound is `(10 + 1) × 50 = 550`, before adding migration connections — already above the 450 allocatable on an illustrative 500-connection instance with 10% reserved. The actual maximum replicas and pool sizes must fit the provisioned capacity. The Desire Store and PostgreSQL backend designs supply their own pool, surge, and migration budgets; these are not additional defaults imposed here.
 
 `hyperfleet-operator` opens no database connection and contributes zero demand. Platform administration and monitoring connections are accounted for in reserved headroom.
 
@@ -173,7 +173,7 @@ Each database's per-database limit is set to its peak demand (above), derived fr
 
 ### Consumer topology
 
-Remote Appliers never connect to a service database directly: [ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) keeps them behind the authenticated hub service. The service that fronts the Desire Store, and the Broker consumption topology, are decided by [HYPERFLEET-1645](https://redhat.atlassian.net/browse/HYPERFLEET-1645) and [HYPERFLEET-1656](https://redhat.atlassian.net/browse/HYPERFLEET-1656); this design does not define them.
+Remote Appliers never connect to a service database directly: [ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) keeps them behind the authenticated dedicated Hub service selected by [HYPERFLEET-1737](https://redhat.atlassian.net/browse/HYPERFLEET-1737). The Broker consumption topology remains covered by [HYPERFLEET-1656](https://redhat.atlassian.net/browse/HYPERFLEET-1656).
 
 ### Operational rules
 
