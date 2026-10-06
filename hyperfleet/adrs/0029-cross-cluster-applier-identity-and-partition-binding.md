@@ -16,11 +16,15 @@ Remote Appliers use projected Kubernetes service-account JWTs issued by their ma
 
 The Hub operator manages AuthConfig entries mapping each remote identity `(issuer, subject, audience)` to exactly one partition. The operator controls onboarding, replacement, and disablement. The gateway injects trusted scope, and the API does not use client-supplied partition headers.
 
+The gateway validates the management-cluster token and issues an internal signed Hub Wristband with caller and partition claims. The API validates the Wristband and authorizes from its claims, not client-supplied partition headers. The Wristband is used only between the gateway and API.
+
+Binding revocation must have a defined maximum delay and an emergency invalidation path independent of cache expiry. The detailed design will define the cache TTL upper bound and invalidation mechanism.
+
 The detailed design will specify gateway and API-side token-validation configuration and authorization rules.
 
 ## Consequences
 
-**Gains:** Remote Appliers receive refreshed local credentials; partition ownership and revocation are centrally controlled; the existing gateway boundary remains in use.
+**Gains:** Remote Appliers receive refreshed local credentials; partition ownership and revocation are centrally controlled; the existing Envoy/Authorino security model remains in use through the dedicated Desire Store gateway.
 
 **Trade-offs:** The design depends on operator reconciliation and AuthConfig propagation, revocation is bounded by gateway cache lifetime, and the new caller class requires additional AuthConfig.
 

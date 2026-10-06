@@ -47,7 +47,7 @@ Three application databases live on the shared instance in the recommended Postg
 | Database | Contents | Schema and migration owner |
 |----------|----------|-------|
 | `hyperfleet` | API application state: `Cluster`, `NodePool`, `Channel`, `Version`, `WifConfig`, adapter statuses, enrichment tables | `hyperfleet-api` component |
-| `desire_store` | The Desire Store database | Decided by [HYPERFLEET-1671](https://redhat.atlassian.net/browse/HYPERFLEET-1671) (store backend); the service that reads it is decided by [HYPERFLEET-1645](https://redhat.atlassian.net/browse/HYPERFLEET-1645) |
+| `desire_store` | The Desire Store database | Store backend decided by [HYPERFLEET-1671](https://redhat.atlassian.net/browse/HYPERFLEET-1671); the dedicated service that reads it is selected by [HYPERFLEET-1737](https://redhat.atlassian.net/browse/HYPERFLEET-1737) |
 | `event_store` | Events and consumer tracking for the PostgreSQL backend for the Broker | Decided by [HYPERFLEET-1656](https://redhat.atlassian.net/browse/HYPERFLEET-1656) (PostgreSQL backend design) |
 
 `hyperfleet` is the name the API Helm chart already uses (`config.database.name`). The PostgreSQL backend for the Broker uses `event_store` through the `hyperfleet-broker` library. Broker names the messaging role; `event_store` names the database for this backend. This does not introduce a separate Broker deployment or an event-sourcing model for the API. Each database holds one workload's tables; none uses schema-level multiplexing inside another database.

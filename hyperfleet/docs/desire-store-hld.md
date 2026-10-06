@@ -49,7 +49,7 @@ flowchart LR
         GC["Centralized sweeper"]
         OP["Hub HyperFleet operator"]
         AC["Operator-managed AuthConfig"]
-        GW["Private Envoy + Authorino gateway"]
+        GW["Dedicated private Envoy + Authorino gateway"]
         DS["Desire Store API service"]
         PG[("Private Postgres")]
 
@@ -59,8 +59,8 @@ flowchart LR
         AD -->|"API request"| GW
         GC -->|"partition-scoped cleanup"| GW
         OP -->|"reconcile caller and partition policy"| AC
-        AP -->|"HTTPS; no DB credentials"| GW
-        GW -->|"trusted identity and partition"| DS
+        AP -->|"HTTPS over approved private network path; no DB credentials"| GW
+        GW -->|"signed Wristband with trusted identity and partition"| DS
         GW -.->|"read AuthConfig policy"| AC
         DS -->|"service database role"| PG
     end
@@ -73,25 +73,35 @@ sequenceDiagram
     participant AP as Remote Applier
     participant ENV as Envoy
     participant AUTH as Authorino
+    participant MCISS as Management-cluster JWT issuer
     participant API as Desire Store API
     participant PG as Postgres
 
     AP->>ENV: HTTPS request with projected management-cluster JWT
     ENV->>ENV: Strip client identity and partition headers
     ENV->>AUTH: Authorize request
-    alt Valid credential and partition
-        AUTH->>AUTH: Validate issuer, signature, audience, and subject
-        AUTH->>AUTH: Resolve identity to one partition
-        AUTH-->>ENV: Allow and inject trusted identity and partition
-        ENV->>API: Forward bearer token with trusted caller and partition
-        API->>API: Validate bearer JWT as defense-in-depth
-        API->>API: Check caller, operation, and partition scope
-        API->>PG: Query only the trusted partition
-        PG-->>API: Return partition-scoped result
-        API-->>AP: Return API response
-    else Invalid credential or inactive binding
+    Note over AUTH,MCISS: JWKS may be served from cache; refresh requires issuer reachability
+    AUTH->>MCISS: Resolve issuer JWKS (cached or refresh)
+    MCISS-->>AUTH: Return JWKS or unavailable
+    AUTH->>AUTH: Validate issuer, signature, audience, and subject
+    alt Invalid credential
         AUTH-->>ENV: Deny request
         ENV-->>AP: Reject request
+    else Valid credential
+        AUTH->>AUTH: Resolve operator-managed AuthConfig policy
+        alt Matching policy
+            AUTH-->>ENV: Allow and inject trusted identity and partition
+            ENV->>ENV: Create signed Hub Wristband with trusted claims
+            ENV->>API: Forward signed Wristband to the API
+            API->>API: Validate Wristband signature and claims
+            API->>API: Authorize from signed caller and partition claims
+            API->>PG: Query only the trusted partition
+            PG-->>API: Return partition-scoped result
+            API-->>AP: Return API response
+        else No matching policy
+            AUTH-->>ENV: Deny request
+            ENV-->>AP: Reject request
+        end
     end
 ```
 
@@ -106,20 +116,38 @@ sequenceDiagram
 
 ## Trust Boundaries and Partition Isolation
 
-The Hub and each management cluster are separate trust boundaries. Remote Appliers access the Desire Store through the Hub gateway and never receive Hub or database credentials. Envoy strips caller-supplied identity and partition headers before Authorino validates the caller and injects trusted identity and partition scope.
+The Hub and each management cluster are separate trust boundaries. Remote management clusters reach the private Hub gateway through an approved private network path; the gateway is not publicly exposed.
 
 ## Remote Applier Authentication
 
-Remote Appliers use short-lived projected Kubernetes service-account JWTs issued by their management cluster. The Hub trusts registered management-cluster issuers and validates the issuer, audience, and service-account subject before allowing access. This avoids distributing Hub or database credentials to management clusters.
+Remote Applier authentication defines how the Hub trusts and validates credentials issued by a management cluster.
+
+### Credential Source
+
+Use projected Kubernetes service-account JWTs issued by the management cluster. This avoids distributing Hub or database credentials to management clusters.
 
 **Alternatives:**
 
 - **OCI workload identity:** Not selected because it couples the design to one cloud IAM system.
 - **Hub-minted bearer credentials:** Not selected because they require a separate issuance and renewal service.
 
-**Trade-off:** The Hub must trust and reach each registered management-cluster issuer, and a disabled binding may remain usable until the gateway cache expires.
+**Trade-off:** The Hub must trust each registered management-cluster issuer, but no Hub or database credentials are distributed to management clusters.
 
-**Acceptable because:** Short-lived projected tokens avoid distributing Hub or database credentials, while binding-cache expiry limits the revocation window and failed identity checks fail closed.
+**Acceptable because:** Projected tokens avoid distributing Hub credentials, while the Hub's issuer, audience, and service-account subject checks limit trust to registered identities.
+
+### Key Trust
+
+Use OIDC discovery/JWKS for registered management-cluster issuers. The Hub retrieves public keys, supports key rotation, and requires issuer reachability.
+
+The management-cluster operator must publish the registered issuer's discovery/JWKS endpoint and keep it reachable over the approved private path. If discovery or JWKS retrieval fails, the gateway denies authorization. An issuer discovery failure denies that issuer's requests without invalidating unrelated AuthConfig entries.
+
+**Trust requirements:** Bind trust to the registered service-account identity, not the cluster alone. Issuer, audience, and subject checks are mandatory; any mismatch is denied. The API authorizes from signed Wristband claims, including the partition, rather than trusting client-supplied headers. The DD will define token-lifetime limits and revocation behavior.
+
+**Alternative:** Onboarding key registration avoids issuer reachability at request time, but rotations require an explicit update.
+
+**Trade-off:** The Hub depends on issuer reachability and gateway caching can delay revocation until the cache expires. The gateway must also issue and the API must validate the Wristband consistently.
+
+**Acceptable because:** OIDC discovery supports issuer-managed key rotation, while the signed Wristband gives the API a trusted identity and partition even if the network boundary is bypassed.
 
 ## Identity-to-Partition Binding
 
@@ -152,7 +180,7 @@ The Desire Store API is a dedicated Hub service behind its own private Envoy and
 
 **Acceptable because:** The bounded operations fit request/response semantics, and REST reuses the existing HTTP gateway model while avoiding gRPC schema-management and watch/long-poll connection complexity. Follow-up validation can confirm whether the polling overhead is acceptable.
 
-**Planning workload:** [HYPERFLEET-1432](https://redhat.atlassian.net/browse/HYPERFLEET-1432) models 10,000 clusters polling one partition every 5 seconds with 10 desires: approximately 2,000 reads/sec and 20,000 status writes/sec without deduplication. Synchronized polls produce 10,000 reads per 5 seconds; with an average response of `P` bytes, read bandwidth is approximately `2,000 × P` bytes/sec. This establishes workload scale; [HYPERFLEET-1743](https://redhat.atlassian.net/browse/HYPERFLEET-1743) will evaluate representative payload and transport overhead before the decision is finalized.
+**Planning workload:** [HYPERFLEET-1432](https://redhat.atlassian.net/browse/HYPERFLEET-1432) models 10,000 management-cluster partitions, one Applier poll per partition every 5 seconds, and 10 desires per partition. This represents approximately 2,000 reads/sec and 20,000 status writes/sec without deduplication. [HYPERFLEET-1743](https://redhat.atlassian.net/browse/HYPERFLEET-1743) will evaluate representative payload and transport overhead before the decision is finalized.
 
 ## Database Protection and Partition Isolation
 
