@@ -217,4 +217,4 @@ End-to-end transport and gateway capacity validation, including shared-Postgres 
 
 ## AuthConfig Impact
 
-ADR-0020 remains unchanged. The remote Applier is a distinct partition-scoped caller, as recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md). The DD will define the AuthConfig structure and required operator/gateway changes.
+[ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) governs API-mediated Desire Store access and mandatory partition enforcement. [ADR-0020](../adrs/0020-envoy-authorino-api-gateway.md)'s Envoy/Authorino security model applies to the dedicated Desire Store gateway, while [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md) defines the remote Applier caller model. For remote Appliers, the API authorizes from signed Wristband claims; injected partition headers are not authoritative. The DD will define the AuthConfig structure and required operator/gateway changes.
