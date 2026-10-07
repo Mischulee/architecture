@@ -26,7 +26,7 @@ The detailed design will specify gateway and API-side token-validation configura
 
 **Gains:** Remote Appliers receive refreshed local credentials; partition ownership and revocation are centrally controlled; the existing Envoy/Authorino security model remains in use through the dedicated Desire Store gateway.
 
-**Trade-offs:** The design depends on operator reconciliation and AuthConfig propagation, revocation is bounded by gateway cache lifetime, and the new caller class requires additional AuthConfig.
+**Trade-offs:** The design depends on operator reconciliation and AuthConfig propagation; JWKS and token/Wristband caching may affect verification timing; and the new caller class requires additional AuthConfig.
 
 ## Alternatives Considered
 

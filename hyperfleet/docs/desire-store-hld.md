@@ -144,11 +144,13 @@ Use OIDC discovery/JWKS for registered management-cluster issuers. The Hub retri
 
 The management-cluster operator must publish the registered issuer's discovery/JWKS endpoint and keep it reachable over the approved private path. If discovery or JWKS retrieval fails, the gateway denies authorization. An issuer discovery failure denies that issuer's requests without invalidating unrelated AuthConfig entries.
 
+Issuer selection must avoid trying unrelated AuthConfig entries for each request. JWKS refresh must be bounded and cancellation-aware to prevent request fan-out across management-cluster issuers.
+
 **Trust requirements:** Bind trust to the registered service-account identity, not the cluster alone. Issuer, audience, and subject checks are mandatory; any mismatch is denied. Each AuthConfig entry must require an exact expected `iss` match. The partition is bound to the AuthConfig entry that verifies the token signature, never taken from a claim in the presented management-cluster token. Partition scope is injected only after verification. The API authorizes from signed Wristband claims, including the partition, rather than trusting client-supplied headers. The DD will define token-lifetime limits and revocation behavior.
 
 **Alternative:** Onboarding key registration avoids issuer reachability at request time, but rotations require an explicit update.
 
-**Trade-off:** The Hub depends on issuer reachability and gateway caching can delay revocation until the cache expires. The gateway must also issue and the API must validate the Wristband consistently.
+**Trade-off:** The Hub depends on issuer reachability and AuthConfig reconciliation for onboarding and revocation. JWKS and token/Wristband caching may affect verification timing. The gateway must also issue and the API must validate the Wristband consistently.
 
 **Acceptable because:** OIDC discovery supports issuer-managed key rotation, while the signed Wristband gives the API a trusted identity and partition even if the network boundary is bypassed.
 
