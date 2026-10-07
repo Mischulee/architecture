@@ -91,8 +91,8 @@ sequenceDiagram
     else Valid credential
         AUTH->>AUTH: Resolve operator-managed AuthConfig policy
         alt Matching policy
-            AUTH-->>ENV: Allow and inject trusted identity and partition
             AUTH->>AUTH: Create signed Hub Wristband with trusted claims
+            AUTH-->>ENV: Allow and return trusted identity, partition, and signed Wristband
             ENV->>API: Forward signed Wristband to the API
             API->>API: Validate Wristband signature and claims
             API->>API: Authorize from signed caller and partition claims
