@@ -14,9 +14,9 @@ Last Updated: 2026-10-06
 
 Remote Appliers use projected Kubernetes service-account JWTs issued by their management cluster. The Hub validates the registered issuer, audience, and service-account subject. They are a distinct, partition-scoped caller class; ADR-0020 remains unchanged.
 
-The Hub operator manages AuthConfig entries mapping each remote identity `(issuer, subject, audience)` to exactly one partition. The operator controls onboarding, replacement, and disablement. The gateway injects trusted scope, and the API does not use client-supplied partition headers.
+The Hub operator manages AuthConfig entries mapping each remote identity `(issuer, subject, audience)` to exactly one partition. The verified AuthConfig entry, not a partition claim in the presented management-cluster token, determines the partition. The operator controls onboarding, replacement, and disablement.
 
-The gateway validates the management-cluster token and issues an internal signed Hub Wristband with caller and partition claims. The API validates the Wristband and authorizes from its claims, not client-supplied partition headers. The Wristband is used only between the gateway and API.
+Authorino validates the management-cluster token and issues an internal signed Hub Wristband with caller and partition claims. Envoy forwards the Wristband to the API, which validates it and authorizes from its claims, not client-supplied partition headers. The Wristband is used only between the gateway and API.
 
 Binding revocation must have a defined maximum delay and an emergency invalidation path independent of cache expiry. The detailed design will define the cache TTL upper bound and invalidation mechanism.
 
@@ -35,7 +35,7 @@ The detailed design will specify gateway and API-side token-validation configura
 | Separate identity-to-partition registry | Adds a runtime lookup, cache, and binding-management dependency that operator-managed AuthConfig avoids. |
 | OCI workload identity | Couples the caller model to one cloud IAM system and does not provide a portable management-cluster identity model. |
 | Hub-minted bearer credentials | Requires a separate Hub credential-issuance and renewal service and distributes Hub-issued credentials to management clusters. |
-| Partition in a validated token claim | Couples partition authorization to issuer-controlled claims instead of a Hub-owned binding. |
+| Partition in a management-cluster token claim | Couples partition authorization to a claim controlled by the management-cluster issuer instead of the Hub's AuthConfig mapping. |
 | Deterministic issuer or subject mapping | Couples partition identity to issuer or subject naming and makes identity changes harder to manage. |
 
 ## References

@@ -62,6 +62,7 @@ flowchart LR
         AP -->|"HTTPS over approved private network path; no DB credentials"| GW
         GW -->|"signed Wristband with trusted identity and partition"| DS
         GW -.->|"read AuthConfig policy"| AC
+        GW -.->|"resolve issuer JWKS (cached or refresh)"| MCISS
         DS -->|"service database role"| PG
     end
 ```
@@ -80,7 +81,7 @@ sequenceDiagram
     AP->>ENV: HTTPS request with projected management-cluster JWT
     ENV->>ENV: Strip client identity and partition headers
     ENV->>AUTH: Authorize request
-    Note over AUTH,MCISS: JWKS may be served from cache; refresh requires issuer reachability
+    Note over AUTH, MCISS: JWKS may be served from cache - refresh requires issuer reachability
     AUTH->>MCISS: Resolve issuer JWKS (cached or refresh)
     MCISS-->>AUTH: Return JWKS or unavailable
     AUTH->>AUTH: Validate issuer, signature, audience, and subject
@@ -91,7 +92,7 @@ sequenceDiagram
         AUTH->>AUTH: Resolve operator-managed AuthConfig policy
         alt Matching policy
             AUTH-->>ENV: Allow and inject trusted identity and partition
-            ENV->>ENV: Create signed Hub Wristband with trusted claims
+            AUTH->>AUTH: Create signed Hub Wristband with trusted claims
             ENV->>API: Forward signed Wristband to the API
             API->>API: Validate Wristband signature and claims
             API->>API: Authorize from signed caller and partition claims
@@ -109,10 +110,12 @@ sequenceDiagram
 
 | Caller | Location | Scope | Main responsibility |
 |--------|----------|-------|---------------------|
-| Adapter | Hub | One partition authorized and injected by the gateway per request | Writes desired state and cleanup records. |
+| Adapter | Hub | Fleet-scoped identity; target partition selected per request | Writes desired state and cleanup records. |
 | Remote Applier | Management cluster | Exactly one registered partition | Reads its partition and writes status. |
-| Centralized sweeper | Hub | One partition authorized and injected by the gateway per cleanup request | Finds and cleans up orphaned desires. |
+| Centralized sweeper | Hub | Fleet cleanup identity; target partition selected per cleanup request | Finds and cleans up orphaned desires. |
 | HyperFleet operator | Hub | Proposed AuthConfig policy | Will reconcile remote caller identities and partition mappings. It is not a Desire Store data caller. |
+
+The gateway authenticates Hub callers and provides their caller class. The DD will define how the Adapter and sweeper target partitions are authorized and passed to the API.
 
 ## Trust Boundaries and Partition Isolation
 
@@ -141,7 +144,7 @@ Use OIDC discovery/JWKS for registered management-cluster issuers. The Hub retri
 
 The management-cluster operator must publish the registered issuer's discovery/JWKS endpoint and keep it reachable over the approved private path. If discovery or JWKS retrieval fails, the gateway denies authorization. An issuer discovery failure denies that issuer's requests without invalidating unrelated AuthConfig entries.
 
-**Trust requirements:** Bind trust to the registered service-account identity, not the cluster alone. Issuer, audience, and subject checks are mandatory; any mismatch is denied. The API authorizes from signed Wristband claims, including the partition, rather than trusting client-supplied headers. The DD will define token-lifetime limits and revocation behavior.
+**Trust requirements:** Bind trust to the registered service-account identity, not the cluster alone. Issuer, audience, and subject checks are mandatory; any mismatch is denied. Each AuthConfig entry must require an exact expected `iss` match. The partition is bound to the AuthConfig entry that verifies the token signature, never taken from a claim in the presented management-cluster token. Partition scope is injected only after verification. The API authorizes from signed Wristband claims, including the partition, rather than trusting client-supplied headers. The DD will define token-lifetime limits and revocation behavior.
 
 **Alternative:** Onboarding key registration avoids issuer reachability at request time, but rotations require an explicit update.
 
@@ -151,7 +154,7 @@ The management-cluster operator must publish the registered issuer's discovery/J
 
 ## Identity-to-Partition Binding
 
-The proposed model has the Hub operator manage AuthConfig entries that map each remote Applier identity to exactly one management-cluster partition. Authorino resolves the matching policy and injects the partition scope; the API never derives scope from client parameters or untrusted claims. This requires extending the current operator and gateway configuration to bind each remote Applier identity to a partition; existing issuer, audience, and JWKS settings do not define that binding. The alternatives and rationale are recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md).
+The proposed model has the Hub operator manage AuthConfig entries that map each remote Applier identity to exactly one management-cluster partition. This requires extending the current operator and gateway configuration to bind each remote Applier identity to a partition; existing issuer, audience, and JWKS settings do not define that binding. The alternatives and rationale are recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md).
 
 **Trade-off:** Operator-managed AuthConfig avoids a runtime registry lookup, but requires new dynamic reconciliation and timely propagation of onboarding, replacement, and revocation changes.
 
@@ -163,7 +166,7 @@ The Desire Store API is a dedicated Hub service behind its own private Envoy and
 
 **Alternative:** Host the endpoints in the existing API, but this would couple Desire Store traffic and failures to the general API's resources and releases.
 
-**Trade-off:** A dedicated service adds another deployable and private gateway configuration. A NetworkPolicy must restrict API ingress to its Envoy gateway only, making gateway bypass structurally impossible. It does not isolate shared Postgres capacity.
+**Trade-off:** A dedicated service adds another deployable and private gateway configuration. A [NetworkPolicy](https://redhat.atlassian.net/browse/HYPERFLEET-1613) is required to restrict API ingress to its Envoy gateway, but enforcement depends on the cluster network plugin. The signed Wristband provides defense in depth when NetworkPolicy is missing or not enforced. This does not isolate shared Postgres capacity.
 
 **Acceptable because:** Independent scaling, rollout, and service-level failure isolation are more valuable than the additional stateless service and gateway operations.
 
