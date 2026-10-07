@@ -15,6 +15,8 @@ Last Updated: 2026-10-06
 - [Callers and Boundaries](#callers-and-boundaries)
 - [Trust Boundaries and Partition Isolation](#trust-boundaries-and-partition-isolation)
 - [Remote Applier Authentication](#remote-applier-authentication)
+  - [Credential Source](#credential-source)
+  - [Key Trust](#key-trust)
 - [Identity-to-Partition Binding](#identity-to-partition-binding)
 - [Desire Store API Hosting](#desire-store-api-hosting)
 - [Transport](#transport)
@@ -31,7 +33,7 @@ Last Updated: 2026-10-06
 
 ## Purpose and Scope
 
-The Desire Store is a rebuildable delivery channel between Hub Adapters and Appliers running on management clusters. This document describes the high-level architecture, trust boundaries, callers, and major decisions. A follow-up detailed design will define the API behavior.
+The Desire Store is a rebuildable delivery channel between Adapters running on the Hub cluster and Appliers running on management clusters. This document describes the high-level architecture, trust boundaries, callers, and major decisions. A follow-up Detailed Design (DD) will define the API behavior.
 
 ## Architecture
 
@@ -217,4 +219,4 @@ End-to-end transport and gateway capacity validation, including shared-Postgres 
 
 ## AuthConfig Impact
 
-[ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) governs API-mediated Desire Store access and mandatory partition enforcement. [ADR-0020](../adrs/0020-envoy-authorino-api-gateway.md)'s Envoy/Authorino security model applies to the dedicated Desire Store gateway, while [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md) defines the remote Applier caller model. For remote Appliers, the API authorizes from signed Wristband claims; injected partition headers are not authoritative. The DD will define the AuthConfig structure and required operator/gateway changes.
+[ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) governs API-mediated Desire Store access and mandatory partition enforcement. [ADR-0020](../adrs/0020-envoy-authorino-api-gateway.md)'s Envoy/Authorino security model applies to the dedicated Desire Store gateway, while [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md) defines the remote Applier caller model. For remote Appliers, the API authorizes from signed Wristband claims; injected partition headers are not authoritative. The follow-up Detailed Design will define the AuthConfig structure and required operator/gateway changes.
