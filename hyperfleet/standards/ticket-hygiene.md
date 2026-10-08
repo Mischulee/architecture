@@ -92,7 +92,7 @@ JIRA has no default priority. A ticket created without one shows `Undefined`, wh
 
 ### Tickets Without an Epic
 
-A Story with no applicable parent epic MUST carry the `no-epic-needed` label in place of an Epic Link. Tasks and Bugs without an epic SHOULD carry the same label. The label records that the empty Epic Link is deliberate, so triage can tell it apart from a forgotten link.
+Stories MUST have an Epic Link, and the `no-epic-needed` label does not replace it. A Task or Bug with no applicable parent epic SHOULD carry the `no-epic-needed` label. The label records that the empty Epic Link is deliberate, so triage can tell it apart from a forgotten link.
 
 ### Additional Requirements by Type
 
