@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-08-26
+Last Updated: 2026-10-08
 ---
 
 # HyperFleet Ticket Hygiene Standard
@@ -58,8 +58,20 @@ These fields SHOULD be set when applicable:
 |-------|---------|
 | Fix Version | Target release version |
 | Labels | Additional categorization (e.g., `follow-up`, `tech-debt`) |
-| Priority | Urgency relative to other work (defaults to Normal) |
-| Epic Link | Parent epic for feature tracking (MUST for Stories — see [per-type table](#field-requirements-by-issue-type)) |
+| Priority | Urgency relative to other work (see [Valid Priorities](#valid-priorities)) |
+| Epic Link | Parent epic for feature tracking (MUST for Stories — see [per-type table](#field-requirements-by-issue-type) and [Tickets Without an Epic](#tickets-without-an-epic)) |
+
+### Valid Priorities
+
+| Priority | When to Use |
+|----------|-------------|
+| Blocker | Blocks development or testing; fix immediately |
+| Critical | Crashes, data loss, severe memory leak |
+| Major | Major loss of function |
+| Normal | Most work |
+| Minor | Minor loss of function with an easy workaround |
+
+JIRA has no default priority. A ticket created without one shows `Undefined`, which does not satisfy this standard where Priority is required.
 
 ---
 
@@ -77,6 +89,10 @@ These fields SHOULD be set when applicable:
 | Priority | SHOULD | SHOULD | MUST | SHOULD |
 | Epic Link | MUST | SHOULD | SHOULD | N/A |
 | Labels | MAY | MAY | MAY | MAY |
+
+### Tickets Without an Epic
+
+A Story with no applicable parent epic MUST carry the `no-epic-needed` label in place of an Epic Link. Tasks and Bugs without an epic SHOULD carry the same label. The label records that the empty Epic Link is deliberate, so triage can tell it apart from a forgotten link.
 
 ### Additional Requirements by Type
 
@@ -110,6 +126,7 @@ Each ticket MUST have at least one component assigned. Components fall into two 
 | API | REST API service, handlers, DAOs, middleware | [hyperfleet-api](https://github.com/openshift-hyperfleet/hyperfleet-api) |
 | Applier | Desire store backends, applier controllers, remote applier connectivity | [hyperfleet-applier](https://github.com/openshift-hyperfleet/hyperfleet-applier) |
 | Infra | Helm umbrella charts, Terraform modules, deployment scripts | [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) |
+| Maestro | Maestro server, sdk-go, and maestro-cli changes; Maestro decommissioning | [maestro](https://github.com/openshift-online/maestro) |
 | Message Broker | Shared broker library (Pub/Sub, RabbitMQ, CloudEvents) | [hyperfleet-broker](https://github.com/openshift-hyperfleet/hyperfleet-broker) |
 | Operator | Bundle controller, HyperFleetConfig CRD, OLM packaging, operator lifecycle | [hyperfleet-operator](https://github.com/openshift-hyperfleet/hyperfleet-operator) |
 | Sentinel | Sentinel reconciliation service, decision engine | [hyperfleet-sentinel](https://github.com/openshift-hyperfleet/hyperfleet-sentinel) |
@@ -258,7 +275,7 @@ Acceptance Criteria:
 Story Points: 3
 Component: Adapter
 Activity Type: Quality / Stability / Reliability
-Priority: High
+Priority: Major
 ```
 
 ---
