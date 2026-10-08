@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Architecture Team
-Last Updated: 2026-10-05
+Last Updated: 2026-10-08
 ---
 
 # HyperFleet Glossary
@@ -57,7 +57,7 @@ Definitions for HyperFleet-specific terms, concepts, and abbreviations used acro
 | **hyperfleet-broker** | The Go library ([openshift-hyperfleet/hyperfleet-broker](https://github.com/openshift-hyperfleet/hyperfleet-broker)) that abstracts message broker communication for HyperFleet components. Provides `Publisher` and `Subscriber` interfaces over GCP Pub/Sub and RabbitMQ backends, with built-in CloudEvents support, metrics, and health checks. | Broker |
 | **hyperfleet-operator** | The Kubernetes operator that packages and delivers HyperFleet. Reconciles a `HyperFleetConfig` CR into the set of components defined by the selected bundle. Reports installation health via `Available`, `Progressing`, and `Degraded` conditions on the CR - distinct from adapter-level conditions (same `Available` word, different layer) and API resource-level conditions (`Reconciled`, `LastKnownReconciled`). See: [ADR-0019](../adrs/0019-package-hyperfleet-as-operator.md), [repository](https://github.com/openshift-hyperfleet/hyperfleet-operator) | Operator |
 | **HyperShift** | The Red Hat project for running hosted OpenShift control planes on Kubernetes. HyperFleet manages the provisioning and lifecycle of HyperShift-based clusters. | Adapter Framework, API |
-| **Identity-to-Partition Binding** | A Hub-owned record mapping one remote Applier identity to one management-cluster partition. Disabling the binding revokes access after cached authorization expires. | API, Applier |
+| **Identity-to-Partition Binding** | A Hub-owned record mapping one remote Applier identity to one management-cluster partition. | API, Applier |
 | **Idempotent** | A property of Adapter operations: processing the same event multiple times produces the same result as processing it once. Required because the Message Broker provides at-least-once delivery (events may be delivered more than once). All HyperFleet Adapters must be idempotent. | Adapter Framework, Broker |
 | **Landing Zone Adapter** | An adapter that performs preparatory provisioning work before other adapters run — creating namespaces, secrets, and ConfigMaps that subsequent adapters depend on. | Adapter Framework |
 | **LastKnownReconciled (Condition)** | A resource-level condition introduced in v1.0.0 that replaces the former `Available` aggregated condition. Represents the last-known reconciled state of the resource, computed from required adapter statuses. Unlike `Reconciled`, this condition preserves the last successful reconciliation state even when adapters are processing a new generation. | API |
@@ -91,6 +91,7 @@ Definitions for HyperFleet-specific terms, concepts, and abbreviations used acro
 | **Transient Error** | An error expected to resolve without human intervention (e.g., HTTP 429, 5xx, network timeout, API server overload). When the adapter classifies an error as transient, it returns an error to the broker library, which NACKs the message and triggers redelivery with backoff. See: [ADR-0017](../adrs/0017-adapter-error-taxonomy.md) | Adapter Framework, Broker |
 | **Topic** | A named channel in the Message Broker to which Sentinel publishes events. HyperFleet uses topic naming convention: `hyperfleet.<resourceType>.changed.<version>` (e.g., `hyperfleet.clusters.changed.v1`). | Broker, Sentinel |
 | **Watermill** | The Go pub/sub library ([ThreeDotsLabs/watermill](https://github.com/ThreeDotsLabs/watermill)) used as the transport abstraction inside `hyperfleet-broker`. Watermill handles broker-specific protocol details; the HyperFleet broker library adds CloudEvents conversion, metrics, and health checks on top. | Broker |
+| **Wristband** | An internal signed token used to carry trusted authorization context between HyperFleet services. | API, Adapter Framework, Applier |
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Architecture Team
-Last Updated: 2026-10-06
+Last Updated: 2026-10-08
 ---
 
 # Desire Store Architecture Overview
@@ -29,7 +29,7 @@ Last Updated: 2026-10-06
 - [ADR-0022: API-Mediated Desire Store Access](../adrs/0022-api-mediated-desire-store-access.md)
 - [ADR-0020: Envoy and Authorino API Gateway](../adrs/0020-envoy-authorino-api-gateway.md)
 - [Remote Applier Connectivity and Partition-Scoped Access to Postgres](spike-remote-applier-postgres-access.md)
-- [ADR-0029: Cross-Cluster Applier Identity and Partition Binding](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md)
+- [ADR-0029: Desire Store Authorization](../adrs/0029-desire-store-authorization.md)
 
 ## Purpose and Scope
 
@@ -110,14 +110,14 @@ sequenceDiagram
 
 ## Callers and Boundaries
 
-| Caller | Location | Scope | Main responsibility |
-|--------|----------|-------|---------------------|
-| Adapter | Hub | Fleet-scoped identity; target partition selected per request | Writes desired state and cleanup records. |
-| Remote Applier | Management cluster | Exactly one registered partition | Reads its partition and writes status. |
-| Centralized sweeper | Hub | Fleet cleanup identity; target partition selected per cleanup request | Finds and cleans up orphaned desires. |
-| HyperFleet operator | Hub | Proposed AuthConfig policy | Will reconcile remote caller identities and partition mappings. It is not a Desire Store data caller. |
+| Caller | Location | Main responsibility |
+|--------|----------|---------------------|
+| Adapter | Hub | Writes desired state and cleanup records. |
+| Remote Applier | Management cluster | Reads desires and writes status. |
+| Centralized sweeper | Hub | Finds and cleans up orphaned desires. |
+| HyperFleet operator | Hub | Reconciles remote caller identities and partition mappings. It is not a Desire Store data caller. |
 
-The gateway authenticates Hub callers and provides their caller class. The DD will define how the Adapter and sweeper target partitions are authorized and passed to the API.
+The gateway authenticates each Desire Store data caller and provides its caller class in the signed Wristband. [ADR-0029](../adrs/0029-desire-store-authorization.md) defines caller authorization and partition-selection rules; the Detailed Design will define the concrete AuthConfig, gateway, and API configuration used to enforce them.
 
 ## Trust Boundaries and Partition Isolation
 
@@ -125,11 +125,11 @@ The Hub and each management cluster are separate trust boundaries. Remote manage
 
 ## Remote Applier Authentication
 
-Remote Applier authentication defines how the Hub trusts and validates credentials issued by a management cluster.
+Remote Applier authentication and partition binding are defined in [ADR-0029](../adrs/0029-desire-store-authorization.md). This section summarizes the resulting trust and deployment implications.
 
 ### Credential Source
 
-Use projected Kubernetes service-account JWTs issued by the management cluster. This avoids distributing Hub or database credentials to management clusters.
+Use projected Kubernetes service-account JWTs issued by the management cluster. This avoids distributing Hub or database credentials to management clusters. The Hub trusts only registered management-cluster service-account identities.
 
 **Alternatives:**
 
@@ -148,7 +148,7 @@ The management-cluster operator must publish the registered issuer's discovery/J
 
 Issuer selection must avoid trying unrelated AuthConfig entries for each request. JWKS refresh must be bounded and cancellation-aware to prevent request fan-out across management-cluster issuers.
 
-**Trust requirements:** Bind trust to the registered service-account identity, not the cluster alone. Issuer, audience, and subject checks are mandatory; any mismatch is denied. Each AuthConfig entry must require an exact expected `iss` match. The partition is bound to the AuthConfig entry that verifies the token signature, never taken from a claim in the presented management-cluster token. Partition scope is injected only after verification. The API authorizes from signed Wristband claims, including the partition, rather than trusting client-supplied headers. The DD will define token-lifetime limits and revocation behavior.
+The high-level issuer, key, and Wristband trust model is defined by [ADR-0029](../adrs/0029-desire-store-authorization.md). The Detailed Design will define the concrete validation configuration, token lifetimes, caching, and revocation behavior.
 
 **Alternative:** Onboarding key registration avoids issuer reachability at request time, but rotations require an explicit update.
 
@@ -158,7 +158,7 @@ Issuer selection must avoid trying unrelated AuthConfig entries for each request
 
 ## Identity-to-Partition Binding
 
-The proposed model has the Hub operator manage AuthConfig entries that map each remote Applier identity to exactly one management-cluster partition. This requires extending the current operator and gateway configuration to bind each remote Applier identity to a partition; existing issuer, audience, and JWKS settings do not define that binding. The alternatives and rationale are recorded in [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md).
+The Hub operator manages AuthConfig entries that map each remote Applier identity to exactly one management-cluster partition, as defined in [ADR-0029](../adrs/0029-desire-store-authorization.md). Existing issuer, audience, and JWKS settings do not define that binding; the operator and gateway configuration must add it.
 
 **Trade-off:** Operator-managed AuthConfig avoids a runtime registry lookup, but requires new dynamic reconciliation and timely propagation of onboarding, replacement, and revocation changes.
 
@@ -219,4 +219,4 @@ End-to-end transport and gateway capacity validation, including shared-Postgres 
 
 ## AuthConfig Impact
 
-[ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) governs API-mediated Desire Store access and mandatory partition enforcement. [ADR-0020](../adrs/0020-envoy-authorino-api-gateway.md)'s Envoy/Authorino security model applies to the dedicated Desire Store gateway, while [ADR-0029](../adrs/0029-cross-cluster-applier-identity-and-partition-binding.md) defines the remote Applier caller model. For remote Appliers, the API authorizes from signed Wristband claims; injected partition headers are not authoritative. The follow-up Detailed Design will define the AuthConfig structure and required operator/gateway changes.
+[ADR-0022](../adrs/0022-api-mediated-desire-store-access.md) governs API-mediated Desire Store access and mandatory partition enforcement. [ADR-0020](../adrs/0020-envoy-authorino-api-gateway.md)'s Envoy/Authorino security model applies to the dedicated Desire Store gateway, while [ADR-0029](../adrs/0029-desire-store-authorization.md) defines caller classes, partition scope, and signed Wristband authorization. For every Desire Store data caller, the API authorizes from signed Wristband claims; injected partition headers are not authoritative. The follow-up Detailed Design will define the AuthConfig structure and required operator/gateway changes.
