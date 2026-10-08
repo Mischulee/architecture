@@ -126,7 +126,6 @@ Each ticket MUST have at least one component assigned. Components fall into two 
 | API | REST API service, handlers, DAOs, middleware | [hyperfleet-api](https://github.com/openshift-hyperfleet/hyperfleet-api) |
 | Applier | Desire store backends, applier controllers, remote applier connectivity | [hyperfleet-applier](https://github.com/openshift-hyperfleet/hyperfleet-applier) |
 | Infra | Helm umbrella charts, Terraform modules, deployment scripts | [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) |
-| Maestro | Maestro server, sdk-go, and maestro-cli changes; Maestro decommissioning | [maestro](https://github.com/openshift-online/maestro) |
 | Message Broker | Shared broker library (Pub/Sub, RabbitMQ, CloudEvents) | [hyperfleet-broker](https://github.com/openshift-hyperfleet/hyperfleet-broker) |
 | Operator | Bundle controller, HyperFleetConfig CRD, OLM packaging, operator lifecycle | [hyperfleet-operator](https://github.com/openshift-hyperfleet/hyperfleet-operator) |
 | Sentinel | Sentinel reconciliation service, decision engine | [hyperfleet-sentinel](https://github.com/openshift-hyperfleet/hyperfleet-sentinel) |
