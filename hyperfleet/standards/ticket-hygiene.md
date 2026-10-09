@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-08-26
+Last Updated: 2026-10-08
 ---
 
 # HyperFleet Ticket Hygiene Standard
@@ -58,8 +58,20 @@ These fields SHOULD be set when applicable:
 |-------|---------|
 | Fix Version | Target release version |
 | Labels | Additional categorization (e.g., `follow-up`, `tech-debt`) |
-| Priority | Urgency relative to other work (defaults to Normal) |
-| Epic Link | Parent epic for feature tracking (MUST for Stories — see [per-type table](#field-requirements-by-issue-type)) |
+| Priority | Urgency relative to other work (see [Valid Priorities](#valid-priorities)) |
+| Epic Link | Parent epic for feature tracking (MUST for Stories — see [per-type table](#field-requirements-by-issue-type) and [Tickets Without an Epic](#tickets-without-an-epic)) |
+
+### Valid Priorities
+
+| Priority | When to Use |
+|----------|-------------|
+| Blocker | Blocks development or testing; fix immediately |
+| Critical | Crashes, data loss, severe memory leak |
+| Major | Major loss of function |
+| Normal | Most work |
+| Minor | Minor loss of function with an easy workaround |
+
+JIRA has no default priority. A ticket created without one shows `Undefined`, which does not satisfy this standard where Priority is required.
 
 ---
 
@@ -77,6 +89,10 @@ These fields SHOULD be set when applicable:
 | Priority | SHOULD | SHOULD | MUST | SHOULD |
 | Epic Link | MUST | SHOULD | SHOULD | N/A |
 | Labels | MAY | MAY | MAY | MAY |
+
+### Tickets Without an Epic
+
+Stories MUST have an Epic Link, and the `no-epic-needed` label does not replace it. A Task or Bug with no applicable parent epic SHOULD carry the `no-epic-needed` label. The label records that the empty Epic Link is deliberate, so triage can tell it apart from a forgotten link.
 
 ### Additional Requirements by Type
 
@@ -258,7 +274,7 @@ Acceptance Criteria:
 Story Points: 3
 Component: Adapter
 Activity Type: Quality / Stability / Reliability
-Priority: High
+Priority: Major
 ```
 
 ---
